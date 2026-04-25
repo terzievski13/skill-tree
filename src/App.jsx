@@ -5,13 +5,16 @@ import Canvas from './components/Canvas'
 import DetailPanel from './components/DetailPanel'
 import useStore from './store/useStore'
 import { themes } from './utils/themes'
+import { FONTS } from './utils/fonts'
 
 function AppInner() {
   const addNode = useStore((s) => s.addNode)
   const undo = useStore((s) => s.undo)
   const redo = useStore((s) => s.redo)
   const theme = useStore((s) => s.theme)
+  const font = useStore((s) => s.font)
   const t = themes[theme] || themes.light
+  const fontFamily = FONTS[font]?.family || FONTS.inter.family
 
   const handleAddNodeAtCenter = useCallback(() => {
     addNode({ x: 200 + Math.random() * 200, y: 200 + Math.random() * 100 })
@@ -42,6 +45,7 @@ function AppInner() {
         height: '100vh',
         overflow: 'hidden',
         background: t.canvasBg,
+        fontFamily,
       }}
     >
       <Toolbar onAddNode={handleAddNodeAtCenter} />

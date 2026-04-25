@@ -48,47 +48,80 @@ export default function TreeSelector({ onClose }) {
   }
 
   const inputStyle = {
-    flex: 1, border: `1px solid ${t.primary}`, borderRadius: 4,
-    padding: '2px 6px', fontSize: 14, fontFamily: 'inherit', outline: 'none',
-    background: t.inputBg, color: t.textPrimary,
+    flex: 1,
+    border: `1px solid ${t.primary}`,
+    borderRadius: 6,
+    padding: '4px 8px',
+    fontSize: 13,
+    fontFamily: 'inherit',
+    outline: 'none',
+    background: t.inputBg,
+    color: t.textPrimary,
   }
 
   return (
     <div
       ref={ref}
       style={{
-        position: 'absolute', top: 44, right: 0,
+        position: 'absolute',
+        top: 42,
+        right: 0,
         background: t.surface,
         border: `1px solid ${t.border}`,
-        borderRadius: 10,
+        borderRadius: 12,
         boxShadow: t.dropdownShadow,
-        minWidth: 240, zIndex: 600, overflow: 'hidden',
+        minWidth: 220,
+        zIndex: 600,
+        overflow: 'hidden',
       }}
     >
-      <div style={{ padding: '10px 12px 6px', borderBottom: `1px solid ${t.border}` }}>
+      {/* Header */}
+      <div style={{
+        padding: '10px 14px 8px',
+        borderBottom: `1px solid ${t.border}`,
+      }}>
         <p style={{
-          margin: 0, fontSize: 11, fontWeight: 600, color: t.sectionLabel,
-          textTransform: 'uppercase', letterSpacing: '0.06em',
+          margin: 0,
+          fontSize: 10,
+          fontWeight: 600,
+          color: t.sectionLabel,
+          textTransform: 'uppercase',
+          letterSpacing: '0.09em',
         }}>
           Trees
         </p>
       </div>
 
-      <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+      {/* Tree list */}
+      <div style={{ maxHeight: 260, overflowY: 'auto' }}>
         {trees.map((tree) => {
           const isActive = tree.id === activeTreeId
           return (
             <div
               key={tree.id}
               style={{
-                display: 'flex', alignItems: 'center',
+                display: 'flex',
+                alignItems: 'center',
                 padding: '8px 12px',
+                gap: 8,
+                cursor: 'pointer',
                 background: isActive ? t.primaryLight : 'transparent',
-                cursor: 'pointer', gap: 8,
+                transition: 'background 0.1s ease',
+                position: 'relative',
               }}
               onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = t.hoverBg }}
               onMouseLeave={(e) => { e.currentTarget.style.background = isActive ? t.primaryLight : 'transparent' }}
             >
+              {isActive && (
+                <div style={{
+                  position: 'absolute',
+                  left: 0, top: '25%', bottom: '25%',
+                  width: 3,
+                  background: t.primary,
+                  borderRadius: '0 3px 3px 0',
+                }} />
+              )}
+
               {renamingId === tree.id ? (
                 <input
                   value={renameDraft}
@@ -111,10 +144,13 @@ export default function TreeSelector({ onClose }) {
                     setRenameDraft(tree.name)
                   }}
                   style={{
-                    flex: 1, fontSize: 14,
-                    color: isActive ? t.primaryText : t.textPrimary,
+                    flex: 1,
+                    fontSize: 13,
                     fontWeight: isActive ? 500 : 400,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    color: isActive ? t.primaryText : t.textPrimary,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {tree.name}
@@ -126,7 +162,9 @@ export default function TreeSelector({ onClose }) {
                 title="Delete tree"
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  color: t.border, fontSize: 14, padding: 0, lineHeight: 1, flexShrink: 0,
+                  color: t.border, fontSize: 13, padding: '2px 4px',
+                  lineHeight: 1, flexShrink: 0, borderRadius: 4,
+                  transition: 'color 0.12s',
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
                 onMouseLeave={(e) => (e.currentTarget.style.color = t.border)}
@@ -138,6 +176,7 @@ export default function TreeSelector({ onClose }) {
         })}
       </div>
 
+      {/* New tree */}
       <div style={{ padding: '8px 12px', borderTop: `1px solid ${t.border}` }}>
         {creatingNew ? (
           <div style={{ display: 'flex', gap: 6 }}>
@@ -149,19 +188,19 @@ export default function TreeSelector({ onClose }) {
                 if (e.key === 'Enter') submitCreate()
                 if (e.key === 'Escape') setCreatingNew(false)
               }}
-              placeholder="Tree name..."
+              placeholder="Tree name…"
               style={{
-                flex: 1, border: `1px solid ${t.border}`, borderRadius: 6,
-                padding: '6px 8px', fontSize: 14, fontFamily: 'inherit',
+                flex: 1, border: `1px solid ${t.border}`, borderRadius: 7,
+                padding: '6px 8px', fontSize: 13, fontFamily: 'inherit',
                 outline: 'none', background: t.inputBg, color: t.textPrimary,
               }}
             />
             <button
               onClick={submitCreate}
               style={{
-                padding: '6px 12px', borderRadius: 6, border: 'none',
+                padding: '6px 12px', borderRadius: 7, border: 'none',
                 background: t.primary, color: '#FFFFFF', cursor: 'pointer',
-                fontSize: 13, fontFamily: 'inherit',
+                fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
               }}
             >
               Create
@@ -171,19 +210,27 @@ export default function TreeSelector({ onClose }) {
           <button
             onClick={() => setCreatingNew(true)}
             style={{
-              width: '100%', padding: '7px 12px', borderRadius: 6,
-              border: `1px solid ${t.border}`, background: t.surface,
+              width: '100%', padding: '7px 12px', borderRadius: 7,
+              border: `1px dashed ${t.border}`, background: 'none',
               cursor: 'pointer', fontSize: 13, color: t.textSecondary,
               fontFamily: 'inherit', textAlign: 'left',
+              transition: 'border-color 0.12s, color 0.12s',
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = t.hoverBg)}
-            onMouseLeave={(e) => (e.currentTarget.style.background = t.surface)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = t.primary
+              e.currentTarget.style.color = t.primaryText
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = t.border
+              e.currentTarget.style.color = t.textSecondary
+            }}
           >
             + New Tree
           </button>
         )}
       </div>
 
+      {/* Delete confirm modal */}
       {confirmDeleteId && (
         <DeleteTreeModal
           name={trees.find((tr) => tr.id === confirmDeleteId)?.name}
@@ -208,23 +255,23 @@ function DeleteTreeModal({ name, t, onConfirm, onCancel }) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: t.surface, borderRadius: 12, padding: '24px 28px',
+          background: t.surface, borderRadius: 14, padding: '24px 28px',
           width: 320, boxShadow: t.modalShadow, border: `1px solid ${t.border}`,
         }}
       >
-        <p style={{ margin: '0 0 8px', fontWeight: 600, fontSize: 16, color: t.textPrimary }}>
+        <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: 15, color: t.textPrimary }}>
           Delete tree?
         </p>
-        <p style={{ margin: '0 0 20px', fontSize: 14, color: t.textSecondary }}>
+        <p style={{ margin: '0 0 20px', fontSize: 13, color: t.textSecondary, lineHeight: 1.5 }}>
           "{name}" and all its nodes will be permanently deleted.
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button
             onClick={onCancel}
             style={{
-              padding: '8px 16px', borderRadius: 6, border: `1px solid ${t.border}`,
-              background: t.surface, cursor: 'pointer', fontSize: 14,
-              color: t.textPrimary, fontFamily: 'inherit',
+              padding: '7px 16px', borderRadius: 7, border: `1px solid ${t.border}`,
+              background: 'transparent', cursor: 'pointer', fontSize: 13,
+              color: t.textSecondary, fontFamily: 'inherit',
             }}
           >
             Cancel
@@ -232,9 +279,9 @@ function DeleteTreeModal({ name, t, onConfirm, onCancel }) {
           <button
             onClick={onConfirm}
             style={{
-              padding: '8px 16px', borderRadius: 6, border: 'none',
+              padding: '7px 16px', borderRadius: 7, border: 'none',
               background: '#EF4444', color: '#FFFFFF', cursor: 'pointer',
-              fontSize: 14, fontFamily: 'inherit',
+              fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
             }}
           >
             Delete

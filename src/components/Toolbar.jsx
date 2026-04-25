@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import useStore from '../store/useStore'
 import TreeSelector from './TreeSelector'
-import { themes, THEME_CYCLE, THEME_LABELS } from '../utils/themes'
+import SettingsPanel from './SettingsPanel'
+import { themes } from '../utils/themes'
 
 export default function Toolbar({ onAddNode }) {
   const getActiveTree = useStore((s) => s.getActiveTree)
   const renameTree = useStore((s) => s.renameTree)
-  const cycleTheme = useStore((s) => s.cycleTheme)
   const theme = useStore((s) => s.theme)
   const t = themes[theme] || themes.light
 
@@ -14,14 +14,15 @@ export default function Toolbar({ onAddNode }) {
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [showSelector, setShowSelector] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const settingsBtnRef = useRef(null)
+  const selectorBtnRef = useRef(null)
 
   const commitRename = () => {
     const name = nameDraft.trim()
     if (name && activeTree) renameTree(activeTree.id, name)
     setEditingName(false)
   }
-
-  const nextTheme = THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length]
 
   return (
     <div
@@ -92,35 +93,48 @@ export default function Toolbar({ onAddNode }) {
 
       <div style={{ flex: 1 }} />
 
-      {/* Theme toggle */}
-      <button
-        onClick={cycleTheme}
-        title={`Switch to ${THEME_LABELS[nextTheme]} theme`}
-        style={{ ...btnStyle(t), gap: 4 }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = t.hoverBg)}
-        onMouseLeave={(e) => (e.currentTarget.style.background = t.surface)}
-      >
-        {theme === 'light' ? '◑' : theme === 'dark' ? '◐' : '◉'} {THEME_LABELS[theme]}
-      </button>
-
       {/* Tree selector */}
       <div style={{ position: 'relative' }}>
         <button
-          onClick={() => setShowSelector((v) => !v)}
+          ref={selectorBtnRef}
+          onClick={() => { setShowSelector((v) => !v); setShowSettings(false) }}
           title="Switch tree"
           style={{
             ...btnStyle(t),
-            background: showSelector ? t.primaryLight : t.surface,
-            color: showSelector ? t.primaryText : t.textPrimary,
-            borderColor: showSelector ? t.primary : t.border,
+            background: showSelector ? t.hoverBg : t.surface,
           }}
-          onMouseEnter={(e) => !showSelector && (e.currentTarget.style.background = t.hoverBg)}
-          onMouseLeave={(e) => !showSelector && (e.currentTarget.style.background = t.surface)}
+          onMouseEnter={(e) => (e.currentTarget.style.background = t.hoverBg)}
+          onMouseLeave={(e) => (e.currentTarget.style.background = showSelector ? t.hoverBg : t.surface)}
         >
           Trees ▾
         </button>
+        {showSelector && <TreeSelector onClose={() => setShowSelector(false)} triggerRef={selectorBtnRef} />}
+      </div>
 
-        {showSelector && <TreeSelector onClose={() => setShowSelector(false)} />}
+      {/* Settings */}
+      <div style={{ position: 'relative' }}>
+        <button
+          ref={settingsBtnRef}
+          onClick={() => { setShowSettings((v) => !v); setShowSelector(false) }}
+          title="Settings"
+          style={{
+            ...btnStyle(t),
+            background: showSettings ? t.hoverBg : t.surface,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = t.hoverBg)}
+          onMouseLeave={(e) => (e.currentTarget.style.background = showSettings ? t.hoverBg : t.surface)}
+        >
+          Settings
+        </button>
+        {showSettings && (
+          <>
+            <div
+              style={{ position: 'fixed', inset: 0, top: 56, zIndex: 590 }}
+              onClick={() => setShowSettings(false)}
+            />
+            <SettingsPanel onClose={() => setShowSettings(false)} triggerRef={settingsBtnRef} />
+          </>
+        )}
       </div>
     </div>
   )

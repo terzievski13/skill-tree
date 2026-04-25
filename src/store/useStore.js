@@ -15,6 +15,10 @@ function debouncedSave(state) {
       treeData: state.treeData,
       activeTreeId: state.activeTreeId,
       theme: state.theme,
+      font: state.font,
+      dotDensity: state.dotDensity,
+      autoExpand: state.autoExpand,
+      edgeStyle: state.edgeStyle,
     })
   }, 500)
 }
@@ -31,7 +35,11 @@ function buildInitialState() {
       trees: saved.trees,
       treeData: saved.treeData || {},
       activeTreeId: saved.activeTreeId || saved.trees[0].id,
-      theme: saved.theme || 'light',
+      theme: saved.theme || 'navy',
+      font: saved.font || 'inter',
+      dotDensity: saved.dotDensity || 'medium',
+      autoExpand: saved.autoExpand ?? false,
+      edgeStyle: saved.edgeStyle || 'smoothstep',
     }
   }
   const { tree, nodes, edges } = makeDefaultTree('My First Tree')
@@ -39,7 +47,11 @@ function buildInitialState() {
     trees: [tree],
     treeData: { [tree.id]: { nodes, edges } },
     activeTreeId: tree.id,
-    theme: 'light',
+    theme: 'navy',
+    font: 'inter',
+    dotDensity: 'medium',
+    autoExpand: false,
+    edgeStyle: 'smoothstep',
   }
 }
 
@@ -50,6 +62,10 @@ const useStore = create((set, get) => ({
   treeData: initial.treeData,
   activeTreeId: initial.activeTreeId,
   theme: initial.theme,
+  font: initial.font,
+  dotDensity: initial.dotDensity,
+  autoExpand: initial.autoExpand,
+  edgeStyle: initial.edgeStyle,
 
   selectedNodeId: null,
   detailNodeId: null,
@@ -81,6 +97,45 @@ const useStore = create((set, get) => ({
     const current = get().theme
     const idx = THEME_CYCLE.indexOf(current)
     get().setTheme(THEME_CYCLE[(idx + 1) % THEME_CYCLE.length])
+  },
+
+  setFont(font) {
+    set((state) => {
+      const next = { ...state, font }
+      debouncedSave(next)
+      return next
+    })
+  },
+
+  setDotDensity(dotDensity) {
+    set((state) => {
+      const next = { ...state, dotDensity }
+      debouncedSave(next)
+      return next
+    })
+  },
+
+  setAutoExpand(autoExpand) {
+    set((state) => {
+      const next = { ...state, autoExpand }
+      debouncedSave(next)
+      return next
+    })
+  },
+
+  setEdgeStyle(edgeStyle) {
+    set((state) => {
+      const newTreeData = {}
+      for (const [id, data] of Object.entries(state.treeData)) {
+        newTreeData[id] = {
+          ...data,
+          edges: data.edges.map((e) => ({ ...e, type: edgeStyle })),
+        }
+      }
+      const next = { ...state, edgeStyle, treeData: newTreeData }
+      debouncedSave(next)
+      return next
+    })
   },
 
   // --- History ---
@@ -177,7 +232,7 @@ const useStore = create((set, get) => ({
     set((state) => {
       const id = state.activeTreeId
       const current = state.treeData[id] || { nodes: [], edges: [] }
-      const newEdge = { ...connection, type: 'smoothstep', id: generateId('edge') }
+      const newEdge = { ...connection, type: state.edgeStyle, id: generateId('edge') }
       const next = {
         ...state,
         treeData: {

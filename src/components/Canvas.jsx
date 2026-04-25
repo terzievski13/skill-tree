@@ -3,7 +3,6 @@ import ReactFlow, {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   useReactFlow,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
@@ -31,6 +30,9 @@ function CanvasInner() {
   const contextMenuNode = useStore((s) => s.contextMenuNode)
   const setContextMenuNode = useStore((s) => s.setContextMenuNode)
   const theme = useStore((s) => s.theme)
+  const dotDensity = useStore((s) => s.dotDensity)
+  const autoExpand = useStore((s) => s.autoExpand)
+  const edgeStyle = useStore((s) => s.edgeStyle)
   const t = themes[theme] || themes.light
 
   const { screenToFlowPosition } = useReactFlow()
@@ -38,8 +40,11 @@ function CanvasInner() {
   const selectedNodeIdRef = useRef(null)
   const selectedEdgeIdRef = useRef(null)
 
+  const DOT_DENSITY_MAP = { small: { gap: 14, size: 1.0 }, medium: { gap: 22, size: 1.5 }, large: { gap: 35, size: 2.0 } }
+  const { gap: dotGap, size: dotSize } = DOT_DENSITY_MAP[dotDensity] || DOT_DENSITY_MAP.medium
+
   const defaultEdgeOptions = {
-    type: 'smoothstep',
+    type: edgeStyle || 'smoothstep',
     style: { stroke: '#94A3B8', strokeWidth: 2 },
     markerEnd: { type: 'arrowclosed', color: '#94A3B8', width: 12, height: 12 },
   }
@@ -57,8 +62,9 @@ function CanvasInner() {
       selectedNodeIdRef.current = node.id
       selectedEdgeIdRef.current = null
       setSelectedNode(node.id)
+      if (autoExpand) setDetailNode(node.id)
     },
-    [setSelectedNode]
+    [setSelectedNode, setDetailNode, autoExpand]
   )
 
   const handleEdgeClick = useCallback((_e, edge) => {
@@ -136,19 +142,12 @@ function CanvasInner() {
       >
         <Background
           variant={BackgroundVariant.Dots}
-          gap={22}
-          size={1.5}
+          gap={dotGap}
+          size={dotSize}
           color={t.dotColor}
           style={{ background: t.canvasBg }}
         />
         <Controls showInteractive={false} />
-        <MiniMap
-          nodeColor={(node) => {
-            const colors = { not_started: '#9CA3AF', in_progress: '#F59E0B', done: '#10B981' }
-            return colors[node.data?.status] || '#9CA3AF'
-          }}
-          style={{ background: t.miniMapBg, border: `1px solid ${t.border}` }}
-        />
       </ReactFlow>
 
       {contextMenuNode && (

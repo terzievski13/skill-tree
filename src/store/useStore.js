@@ -53,6 +53,7 @@ const useStore = create((set, get) => ({
 
   selectedNodeId: null,
   detailNodeId: null,
+  contextMenuNode: null, // { id, x, y } | null
 
   // undo/redo: { [treeId]: { past: [...snapshots], future: [...snapshots] } }
   history: {},
@@ -294,6 +295,9 @@ const useStore = create((set, get) => ({
   },
   setDetailNode(nodeId) {
     set({ detailNodeId: nodeId })
+  },
+  setContextMenuNode(data) {
+    set({ contextMenuNode: data })
   },
 
   // --- Tree actions ---

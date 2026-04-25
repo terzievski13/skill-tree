@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -23,9 +23,13 @@ function CanvasInner() {
   const setSelectedNode = useStore((s) => s.setSelectedNode)
   const addNode = useStore((s) => s.addNode)
   const deleteNode = useStore((s) => s.deleteNode)
+  const duplicateNode = useStore((s) => s.duplicateNode)
+  const cycleStatus = useStore((s) => s.cycleNodeStatus)
   const saveSnapshot = useStore((s) => s.saveSnapshot)
   const setDetailNode = useStore((s) => s.setDetailNode)
   const detailNodeId = useStore((s) => s.detailNodeId)
+  const contextMenuNode = useStore((s) => s.contextMenuNode)
+  const setContextMenuNode = useStore((s) => s.setContextMenuNode)
   const theme = useStore((s) => s.theme)
   const t = themes[theme] || themes.light
 
@@ -66,12 +70,14 @@ function CanvasInner() {
     selectedNodeIdRef.current = null
     selectedEdgeIdRef.current = null
     setSelectedNode(null)
-  }, [setSelectedNode])
+    setContextMenuNode(null)
+  }, [setSelectedNode, setContextMenuNode])
 
   const handleKeyDown = useCallback(
     (e) => {
       if (e.key === 'Escape') {
         if (detailNodeId) setDetailNode(null)
+        if (contextMenuNode) setContextMenuNode(null)
         return
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -89,8 +95,23 @@ function CanvasInner() {
         }
       }
     },
-    [detailNodeId, setDetailNode, nodes, onEdgesChange, saveSnapshot]
+    [detailNodeId, setDetailNode, contextMenuNode, setContextMenuNode, nodes, onEdgesChange, saveSnapshot]
   )
+
+  const onNodeContextMenu = useCallback(
+    (e, node) => {
+      e.preventDefault()
+      setContextMenuNode({ id: node.id, x: e.clientX, y: e.clientY })
+    },
+    [setContextMenuNode]
+  )
+
+  const handleContextMenuDelete = useCallback(() => {
+    if (!contextMenuNode) return
+    const node = nodes.find((n) => n.id === contextMenuNode.id)
+    setContextMenuNode(null)
+    if (node) setConfirmDeleteNode(node)
+  }, [contextMenuNode, nodes, setContextMenuNode])
 
   return (
     <div style={{ flex: 1, position: 'relative' }} onKeyDown={handleKeyDown} tabIndex={-1}>
@@ -106,6 +127,7 @@ function CanvasInner() {
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
         onPaneDoubleClick={handlePaneDoubleClick}
+        onNodeContextMenu={onNodeContextMenu}
         deleteKeyCode={null}
         fitView
         fitViewOptions={{ padding: 0.3 }}
@@ -129,6 +151,18 @@ function CanvasInner() {
         />
       </ReactFlow>
 
+      {contextMenuNode && (
+        <NodeContextMenu
+          x={contextMenuNode.x}
+          y={contextMenuNode.y}
+          t={t}
+          onClose={() => setContextMenuNode(null)}
+          onCycleStatus={() => { cycleStatus(contextMenuNode.id); setContextMenuNode(null) }}
+          onDuplicate={() => { duplicateNode(contextMenuNode.id); setContextMenuNode(null) }}
+          onDelete={handleContextMenuDelete}
+        />
+      )}
+
       {confirmDeleteNode && (
         <DeleteConfirmModal
           label={confirmDeleteNode.data.label}
@@ -141,6 +175,71 @@ function CanvasInner() {
           onCancel={() => setConfirmDeleteNode(null)}
         />
       )}
+    </div>
+  )
+}
+
+function NodeContextMenu({ x, y, t, onClose, onDelete, onDuplicate, onCycleStatus }) {
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
+  }, [onClose])
+
+  const adjustedX = Math.min(x, window.innerWidth - 175)
+  const adjustedY = Math.min(y, window.innerHeight - 130)
+
+  const items = [
+    { label: 'Cycle Status', action: onCycleStatus },
+    { label: 'Duplicate Node', action: onDuplicate },
+    { label: 'Delete Node', action: onDelete, danger: true },
+  ]
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: 'fixed',
+        top: adjustedY, left: adjustedX,
+        background: t.surface,
+        border: `1px solid ${t.border}`,
+        borderRadius: 8,
+        boxShadow: t.dropdownShadow,
+        zIndex: 9999,
+        minWidth: 165,
+        overflow: 'hidden',
+      }}
+    >
+      {items.map((item) => (
+        <button
+          key={item.label}
+          onClick={item.action}
+          style={{
+            display: 'block',
+            width: '100%',
+            textAlign: 'left',
+            padding: '10px 14px',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: 14,
+            color: item.danger ? '#EF4444' : t.textPrimary,
+            fontFamily: 'inherit',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = t.hoverBg)}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+        >
+          {item.label}
+        </button>
+      ))}
     </div>
   )
 }

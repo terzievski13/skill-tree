@@ -97,8 +97,10 @@ export default function DetailPanel() {
         onClick={(e) => e.stopPropagation()}
         style={{
           position: 'fixed',
-          top: 56, right: 0, bottom: 0,
-          width: 380,
+          top: window.innerWidth < 640 ? 0 : 56,
+          right: 0,
+          bottom: 0,
+          width: window.innerWidth < 640 ? '100%' : 380,
           background: t.surface,
           borderLeft: `1px solid ${t.border}`,
           boxShadow: t.panelShadow,
@@ -138,7 +140,9 @@ export default function DetailPanel() {
               onClick={() => setDetailNode(null)}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 18, color: t.textSecondary, padding: 0, lineHeight: 1, flexShrink: 0,
+                fontSize: 18, color: t.textSecondary, padding: '4px 8px',
+                lineHeight: 1, flexShrink: 0, minWidth: 36, minHeight: 36,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
               title="Close"
             >

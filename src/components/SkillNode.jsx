@@ -7,15 +7,15 @@ import { themes } from '../utils/themes'
 export default function SkillNode({ id, data, selected }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(data.label)
-  const [contextMenu, setContextMenu] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const inputRef = useRef(null)
+  const longPressTimer = useRef(null)
 
   const cycleStatus = useStore((s) => s.cycleNodeStatus)
   const updateData = useStore((s) => s.updateNodeData)
   const deleteNode = useStore((s) => s.deleteNode)
-  const duplicateNode = useStore((s) => s.duplicateNode)
   const setDetailNode = useStore((s) => s.setDetailNode)
+  const setContextMenuNode = useStore((s) => s.setContextMenuNode)
   const theme = useStore((s) => s.theme)
   const t = themes[theme] || themes.light
 
@@ -45,18 +45,31 @@ export default function SkillNode({ id, data, selected }) {
     }
   }
 
-  const handleContextMenu = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setContextMenu({ x: e.clientX, y: e.clientY })
-  }
+  const handleTouchStart = useCallback((e) => {
+    const touch = e.touches[0]
+    const x = touch.clientX
+    const y = touch.clientY
+    longPressTimer.current = setTimeout(() => {
+      setContextMenuNode({ id, x, y })
+    }, 500)
+  }, [id, setContextMenuNode])
+
+  const handleTouchEnd = useCallback(() => {
+    clearTimeout(longPressTimer.current)
+  }, [])
+
+  const handleTouchMove = useCallback(() => {
+    clearTimeout(longPressTimer.current)
+  }, [])
 
   const isDone = data.status === 'done'
 
   return (
     <>
       <div
-        onContextMenu={handleContextMenu}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchMove={handleTouchMove}
         style={{
           background: isDone ? t.nodeBgDone : t.nodeBg,
           border: `${selected ? '2px' : '1px'} solid ${selected ? t.primary : t.border}`,
@@ -73,6 +86,33 @@ export default function SkillNode({ id, data, selected }) {
           position: 'relative',
         }}
       >
+        {selected && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }}
+            title="Delete node"
+            style={{
+              position: 'absolute',
+              top: -9, right: -9,
+              width: 20, height: 20,
+              borderRadius: '50%',
+              background: '#EF4444',
+              color: '#FFFFFF',
+              border: '2px solid ' + t.canvasBg,
+              cursor: 'pointer',
+              fontSize: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10,
+              padding: 0,
+              lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        )}
+
         <StatusBadge
           status={data.status}
           size={10}
@@ -141,41 +181,11 @@ export default function SkillNode({ id, data, selected }) {
           ⋮
         </button>
 
-        <Handle
-          type="target"
-          position={Position.Top}
-          style={{ background: '#94A3B8', width: 8, height: 8 }}
-        />
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          style={{ background: '#94A3B8', width: 8, height: 8 }}
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="right"
-          style={{ background: '#94A3B8', width: 8, height: 8 }}
-        />
-        <Handle
-          type="target"
-          position={Position.Left}
-          id="left"
-          style={{ background: '#94A3B8', width: 8, height: 8 }}
-        />
+        <Handle type="target" position={Position.Top} style={{ background: '#94A3B8', width: 8, height: 8 }} />
+        <Handle type="source" position={Position.Bottom} style={{ background: '#94A3B8', width: 8, height: 8 }} />
+        <Handle type="source" position={Position.Right} id="right" style={{ background: '#94A3B8', width: 8, height: 8 }} />
+        <Handle type="target" position={Position.Left} id="left" style={{ background: '#94A3B8', width: 8, height: 8 }} />
       </div>
-
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          t={t}
-          onClose={() => setContextMenu(null)}
-          onDelete={() => { setContextMenu(null); setConfirmDelete(true) }}
-          onDuplicate={() => { setContextMenu(null); duplicateNode(id) }}
-          onCycleStatus={() => { setContextMenu(null); cycleStatus(id) }}
-        />
-      )}
 
       {confirmDelete && (
         <DeleteConfirmModal
@@ -186,64 +196,6 @@ export default function SkillNode({ id, data, selected }) {
         />
       )}
     </>
-  )
-}
-
-function ContextMenu({ x, y, t, onClose, onDelete, onDuplicate, onCycleStatus }) {
-  const ref = useRef(null)
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose()
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [onClose])
-
-  const items = [
-    { label: 'Cycle Status', action: onCycleStatus },
-    { label: 'Duplicate Node', action: onDuplicate },
-    { label: 'Delete Node', action: onDelete, danger: true },
-  ]
-
-  return (
-    <div
-      ref={ref}
-      style={{
-        position: 'fixed',
-        top: y, left: x,
-        background: t.surface,
-        border: `1px solid ${t.border}`,
-        borderRadius: 8,
-        boxShadow: t.dropdownShadow,
-        zIndex: 9999,
-        minWidth: 160,
-        overflow: 'hidden',
-      }}
-    >
-      {items.map((item) => (
-        <button
-          key={item.label}
-          onClick={item.action}
-          style={{
-            display: 'block',
-            width: '100%',
-            textAlign: 'left',
-            padding: '8px 14px',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: 14,
-            color: item.danger ? '#EF4444' : t.textPrimary,
-            fontFamily: 'inherit',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = t.hoverBg)}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
   )
 }
 

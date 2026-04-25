@@ -14,6 +14,7 @@ export default function DetailPanel() {
   const detailNodeId = useStore((s) => s.detailNodeId)
   const setDetailNode = useStore((s) => s.setDetailNode)
   const updateData = useStore((s) => s.updateNodeData)
+  const deleteNode = useStore((s) => s.deleteNode)
   const theme = useStore((s) => s.theme)
   const t = themes[theme] || themes.light
 
@@ -27,6 +28,7 @@ export default function DetailPanel() {
   const [addingLink, setAddingLink] = useState(false)
   const [linkTitle, setLinkTitle] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
     setAddingLink(false)
@@ -267,8 +269,65 @@ export default function DetailPanel() {
               style={textareaStyle}
             />
           </Section>
+
+          <div style={{ marginTop: 8, paddingTop: 16, borderTop: `1px solid ${t.border}` }}>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              style={{
+                width: '100%',
+                padding: '8px 14px',
+                borderRadius: 6,
+                border: `1px solid #FCA5A5`,
+                background: 'none',
+                color: '#EF4444',
+                cursor: 'pointer',
+                fontSize: 14,
+                fontFamily: 'inherit',
+              }}
+            >
+              Delete Node
+            </button>
+          </div>
         </div>
       </div>
+
+      {confirmDelete && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: t.modalOverlay,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
+          }}
+          onClick={() => setConfirmDelete(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: t.surface, borderRadius: 12, padding: '24px 28px',
+              width: 320, boxShadow: t.modalShadow, border: `1px solid ${t.border}`,
+            }}
+          >
+            <p style={{ margin: '0 0 8px', fontWeight: 600, fontSize: 16, color: t.textPrimary }}>
+              Delete node?
+            </p>
+            <p style={{ margin: '0 0 20px', fontSize: 14, color: t.textSecondary }}>
+              "{data.label}" and all its connections will be removed.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmDelete(false)} style={secondaryBtn(t)}>Cancel</button>
+              <button
+                onClick={() => { deleteNode(detailNodeId); setConfirmDelete(false) }}
+                style={{
+                  padding: '8px 16px', borderRadius: 6, border: 'none',
+                  background: '#EF4444', color: '#FFFFFF', cursor: 'pointer',
+                  fontSize: 14, fontFamily: 'inherit',
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

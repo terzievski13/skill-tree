@@ -7,13 +7,11 @@ import { themes } from '../utils/themes'
 export default function SkillNode({ id, data, selected }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(data.label)
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const inputRef = useRef(null)
   const longPressTimer = useRef(null)
 
   const cycleStatus = useStore((s) => s.cycleNodeStatus)
   const updateData = useStore((s) => s.updateNodeData)
-  const deleteNode = useStore((s) => s.deleteNode)
   const setDetailNode = useStore((s) => s.setDetailNode)
   const setContextMenuNode = useStore((s) => s.setContextMenuNode)
   const theme = useStore((s) => s.theme)
@@ -86,33 +84,6 @@ export default function SkillNode({ id, data, selected }) {
           position: 'relative',
         }}
       >
-        {selected && (
-          <button
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }}
-            title="Delete node"
-            style={{
-              position: 'absolute',
-              top: -9, right: -9,
-              width: 20, height: 20,
-              borderRadius: '50%',
-              background: '#EF4444',
-              color: '#FFFFFF',
-              border: '2px solid ' + t.canvasBg,
-              cursor: 'pointer',
-              fontSize: 10,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10,
-              padding: 0,
-              lineHeight: 1,
-            }}
-          >
-            ✕
-          </button>
-        )}
-
         <StatusBadge
           status={data.status}
           size={10}
@@ -187,63 +158,6 @@ export default function SkillNode({ id, data, selected }) {
         <Handle type="target" position={Position.Left} id="left" style={{ background: '#94A3B8', width: 8, height: 8 }} />
       </div>
 
-      {confirmDelete && (
-        <DeleteConfirmModal
-          label={data.label}
-          t={t}
-          onConfirm={() => { setConfirmDelete(false); deleteNode(id) }}
-          onCancel={() => setConfirmDelete(false)}
-        />
-      )}
     </>
-  )
-}
-
-function DeleteConfirmModal({ label, t, onConfirm, onCancel }) {
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, background: t.modalOverlay,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
-      }}
-      onClick={onCancel}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: t.surface, borderRadius: 12, padding: '24px 28px',
-          width: 320, boxShadow: t.modalShadow, border: `1px solid ${t.border}`,
-        }}
-      >
-        <p style={{ margin: '0 0 8px', fontWeight: 600, fontSize: 16, color: t.textPrimary }}>
-          Delete node?
-        </p>
-        <p style={{ margin: '0 0 20px', fontSize: 14, color: t.textSecondary }}>
-          "{label}" and all its connections will be removed.
-        </p>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button
-            onClick={onCancel}
-            style={{
-              padding: '8px 16px', borderRadius: 6, border: `1px solid ${t.border}`,
-              background: t.surface, cursor: 'pointer', fontSize: 14,
-              color: t.textPrimary, fontFamily: 'inherit',
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            style={{
-              padding: '8px 16px', borderRadius: 6, border: 'none',
-              background: '#EF4444', color: '#FFFFFF', cursor: 'pointer',
-              fontSize: 14, fontFamily: 'inherit',
-            }}
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }

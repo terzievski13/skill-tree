@@ -13,6 +13,19 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html, body {
+  overflow: hidden;
+  overscroll-behavior: none;
+  /* Prevent iOS Safari rubber-band bounce */
+  position: fixed;
+  width: 100%;
+}
+
+#root {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 /* Slim custom scrollbars */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }

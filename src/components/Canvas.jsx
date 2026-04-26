@@ -37,6 +37,7 @@ function CanvasInner() {
 
   const { screenToFlowPosition } = useReactFlow()
   const [confirmDeleteNode, setConfirmDeleteNode] = useState(null)
+  const [mobileEdgeTap, setMobileEdgeTap] = useState(null) // { id, x, y }
   const selectedNodeIdRef = useRef(null)
   const selectedEdgeIdRef = useRef(null)
 
@@ -67,9 +68,12 @@ function CanvasInner() {
     [setSelectedNode, setDetailNode, autoExpand]
   )
 
-  const handleEdgeClick = useCallback((_e, edge) => {
+  const handleEdgeClick = useCallback((e, edge) => {
     selectedEdgeIdRef.current = edge.id
     selectedNodeIdRef.current = null
+    if (window.innerWidth < 640) {
+      setMobileEdgeTap({ id: edge.id, x: e.clientX, y: e.clientY })
+    }
   }, [])
 
   const handlePaneClick = useCallback(() => {
@@ -77,6 +81,7 @@ function CanvasInner() {
     selectedEdgeIdRef.current = null
     setSelectedNode(null)
     setContextMenuNode(null)
+    setMobileEdgeTap(null)
   }, [setSelectedNode, setContextMenuNode])
 
   const handleKeyDown = useCallback(
@@ -172,6 +177,21 @@ function CanvasInner() {
             setConfirmDeleteNode(null)
           }}
           onCancel={() => setConfirmDeleteNode(null)}
+        />
+      )}
+
+      {mobileEdgeTap && (
+        <MobileEdgeDeletePopup
+          x={mobileEdgeTap.x}
+          y={mobileEdgeTap.y}
+          t={t}
+          onDelete={() => {
+            saveSnapshot()
+            onEdgesChange([{ type: 'remove', id: mobileEdgeTap.id }])
+            selectedEdgeIdRef.current = null
+            setMobileEdgeTap(null)
+          }}
+          onCancel={() => setMobileEdgeTap(null)}
         />
       )}
     </div>
@@ -270,6 +290,48 @@ function DeleteConfirmModal({ label, t, onConfirm, onCancel }) {
           <button onClick={onConfirm} style={dangerBtn}>Delete</button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function MobileEdgeDeletePopup({ x, y, t, onDelete, onCancel }) {
+  const adjustedX = Math.min(Math.max(x - 60, 8), window.innerWidth - 136)
+  const adjustedY = Math.min(Math.max(y - 52, 8), window.innerHeight - 100)
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: adjustedY,
+        left: adjustedX,
+        background: t.surface,
+        border: `1px solid ${t.border}`,
+        borderRadius: 10,
+        boxShadow: t.dropdownShadow,
+        zIndex: 9999,
+        display: 'flex',
+        overflow: 'hidden',
+      }}
+    >
+      <button
+        onClick={onDelete}
+        style={{
+          padding: '10px 14px', background: 'none', border: 'none',
+          cursor: 'pointer', fontSize: 13, color: '#EF4444', fontFamily: 'inherit',
+          borderRight: `1px solid ${t.border}`,
+        }}
+      >
+        Delete Edge
+      </button>
+      <button
+        onClick={onCancel}
+        style={{
+          padding: '10px 12px', background: 'none', border: 'none',
+          cursor: 'pointer', fontSize: 13, color: t.textSecondary, fontFamily: 'inherit',
+        }}
+      >
+        Cancel
+      </button>
     </div>
   )
 }

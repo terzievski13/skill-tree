@@ -48,6 +48,7 @@ export default function SettingsPanel({ onClose, triggerRef }) {
   return (
     <div
       ref={ref}
+      onTouchMove={(e) => e.stopPropagation()}
       style={{
         position: 'absolute',
         top: 44,
@@ -60,6 +61,7 @@ export default function SettingsPanel({ onClose, triggerRef }) {
         zIndex: 600,
         overflowY: 'auto',
         maxHeight: 'calc(100vh - 70px)',
+        WebkitOverflowScrolling: 'touch',
       }}
     >
       {/* Theme section */}

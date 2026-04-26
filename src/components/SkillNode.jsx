@@ -10,6 +10,7 @@ export default function SkillNode({ id, data, selected }) {
   const [hovered, setHovered] = useState(false)
   const inputRef = useRef(null)
   const longPressTimer = useRef(null)
+  const touchStartPos = useRef(null)
 
   const cycleStatus = useStore((s) => s.cycleNodeStatus)
   const updateData = useStore((s) => s.updateNodeData)
@@ -41,15 +42,24 @@ export default function SkillNode({ id, data, selected }) {
 
   const handleTouchStart = useCallback((e) => {
     const touch = e.touches[0]
-    const x = touch.clientX
-    const y = touch.clientY
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY }
     longPressTimer.current = setTimeout(() => {
-      setContextMenuNode({ id, x, y })
-    }, 500)
+      setContextMenuNode({ id, x: touch.clientX, y: touch.clientY })
+    }, 450)
   }, [id, setContextMenuNode])
 
-  const handleTouchEnd = useCallback(() => { clearTimeout(longPressTimer.current) }, [])
-  const handleTouchMove = useCallback(() => { clearTimeout(longPressTimer.current) }, [])
+  const handleTouchEnd = useCallback(() => {
+    clearTimeout(longPressTimer.current)
+    touchStartPos.current = null
+  }, [])
+
+  const handleTouchMove = useCallback((e) => {
+    if (!touchStartPos.current) return
+    const touch = e.touches[0]
+    const dx = Math.abs(touch.clientX - touchStartPos.current.x)
+    const dy = Math.abs(touch.clientY - touchStartPos.current.y)
+    if (dx > 8 || dy > 8) clearTimeout(longPressTimer.current)
+  }, [])
 
   const isDone = data.status === 'done'
 
@@ -73,6 +83,7 @@ export default function SkillNode({ id, data, selected }) {
         gap: 8,
         cursor: 'default',
         userSelect: 'none',
+        WebkitTouchCallout: 'none',
         position: 'relative',
         transition: 'box-shadow 0.15s ease',
       }}

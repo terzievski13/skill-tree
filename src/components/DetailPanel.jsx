@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import useStore from '../store/useStore'
 import StatusBadge from './StatusBadge'
 import { STATUS_CYCLE, generateId } from '../utils/defaults'
@@ -29,11 +29,26 @@ export default function DetailPanel() {
   const [linkUrl, setLinkUrl] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  // Bottom-sheet animation state (mobile only)
+  const [visible, setVisible] = useState(false)
+  const [dragY, setDragY] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const dragStartY = useRef(null)
+
+  const isMobile = window.innerWidth < 640
+
   useEffect(() => {
     setAddingLink(false)
     setLinkTitle('')
     setLinkUrl('')
     setConfirmDelete(false)
+    // Trigger open animation
+    setVisible(false)
+    setDragY(0)
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setVisible(true))
+    })
+    return () => cancelAnimationFrame(raf)
   }, [detailNodeId])
 
   useEffect(() => {
@@ -44,7 +59,6 @@ export default function DetailPanel() {
 
   if (!node) return null
 
-  const isMobile = window.innerWidth < 640
   const update = (patch) => updateData(detailNodeId, patch)
 
   const saveLink = () => {
@@ -59,6 +73,41 @@ export default function DetailPanel() {
 
   const deleteLink = (linkId) => {
     update({ links: (data.links || []).filter((l) => l.id !== linkId) })
+  }
+
+  const handleClose = () => {
+    if (isMobile) {
+      setDragY(window.innerHeight)
+      setTimeout(() => setDetailNode(null), 280)
+    } else {
+      setDetailNode(null)
+    }
+  }
+
+  // Drag-to-close handlers (mobile only)
+  const handleDragStart = (e) => {
+    dragStartY.current = e.touches[0].clientY
+    setIsDragging(true)
+  }
+
+  const handleDragMove = (e) => {
+    if (dragStartY.current === null) return
+    const dy = e.touches[0].clientY - dragStartY.current
+    if (dy > 0) {
+      setDragY(dy)
+      e.preventDefault()
+    }
+  }
+
+  const handleDragEnd = () => {
+    setIsDragging(false)
+    dragStartY.current = null
+    if (dragY > 100) {
+      setDragY(window.innerHeight)
+      setTimeout(() => setDetailNode(null), 280)
+    } else {
+      setDragY(0)
+    }
   }
 
   const inputStyle = {
@@ -80,259 +129,303 @@ export default function DetailPanel() {
     lineHeight: 1.6,
   }
 
+  // Shared content (header + body)
+  const panelContent = (
+    <>
+      {/* Header */}
+      <div style={{ padding: '16px 18px 14px', borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
+          <input
+            value={data.label}
+            onChange={(e) => update({ label: e.target.value })}
+            placeholder="Node title"
+            style={{
+              flex: 1,
+              fontSize: 17,
+              fontWeight: 600,
+              letterSpacing: '-0.01em',
+              color: t.textPrimary,
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              fontFamily: 'inherit',
+              lineHeight: '1.3',
+            }}
+          />
+          <button
+            onClick={handleClose}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 18, color: t.textTertiary, padding: '4px 6px',
+              lineHeight: 1, flexShrink: 0, borderRadius: 6,
+              minWidth: 32, minHeight: 32,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            title="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Status pills */}
+        <div style={{ display: 'flex', gap: 5 }}>
+          {STATUS_CYCLE.map((s) => {
+            const active = data.status === s
+            return (
+              <button
+                key={s}
+                onClick={() => update({ status: s })}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '4px 10px',
+                  borderRadius: 20,
+                  border: `1px solid ${active ? t.primary : t.border}`,
+                  background: active ? t.primaryLight : 'transparent',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: active ? 600 : 400,
+                  color: active ? t.primaryText : t.textSecondary,
+                  fontFamily: 'inherit',
+                  transition: 'all 0.12s ease',
+                }}
+              >
+                <StatusBadge status={s} size={7} />
+                {STATUS_LABELS[s]}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div
+        style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', WebkitOverflowScrolling: 'touch' }}
+        onTouchMove={(e) => e.stopPropagation()}
+      >
+        <Section label="Notes" t={t}>
+          <textarea
+            value={data.notes}
+            onChange={(e) => update({ notes: e.target.value })}
+            placeholder="Add notes…"
+            rows={5}
+            style={textareaStyle}
+          />
+        </Section>
+
+        <Section label="Links" t={t}>
+          {(data.links || []).map((link) => (
+            <div key={link.id} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              marginBottom: 6, padding: '6px 8px',
+              background: t.inputBg, borderRadius: 7,
+              border: `1px solid ${t.border}`,
+            }}>
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  flex: 1, fontSize: 13, color: t.primary,
+                  textDecoration: 'none', overflow: 'hidden',
+                  textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}
+                title={link.url}
+              >
+                {link.title || link.url}
+              </a>
+              <button
+                onClick={() => deleteLink(link.id)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: t.textTertiary, fontSize: 14, padding: '2px 4px',
+                  lineHeight: 1, flexShrink: 0, borderRadius: 4,
+                  transition: 'color 0.12s',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = t.textTertiary)}
+                title="Remove"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+
+          {addingLink ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+              <input
+                placeholder="Title (optional)"
+                value={linkTitle}
+                onChange={(e) => setLinkTitle(e.target.value)}
+                style={inputStyle}
+              />
+              <input
+                placeholder="https://…"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveLink() }}
+                style={inputStyle}
+              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={saveLink} style={filledBtn(t)}>Save</button>
+                <button onClick={() => setAddingLink(false)} style={outlineBtn(t)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAddingLink(true)}
+              style={{
+                background: 'none',
+                border: `1px dashed ${t.border}`,
+                borderRadius: 7,
+                padding: '7px 12px',
+                fontSize: 13,
+                color: t.textSecondary,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                width: '100%',
+                marginTop: 2,
+                transition: 'border-color 0.12s, color 0.12s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = t.primary
+                e.currentTarget.style.color = t.primaryText
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = t.border
+                e.currentTarget.style.color = t.textSecondary
+              }}
+            >
+              + Add Link
+            </button>
+          )}
+        </Section>
+
+        <Section label="Resources" t={t}>
+          <textarea
+            value={data.resources}
+            onChange={(e) => update({ resources: e.target.value })}
+            placeholder="Books, videos, files…"
+            rows={4}
+            style={textareaStyle}
+          />
+        </Section>
+
+        {/* Delete */}
+        <div style={{ marginTop: 4, paddingTop: 16, borderTop: `1px solid ${t.border}` }}>
+          <button
+            onClick={() => setConfirmDelete(true)}
+            style={{
+              width: '100%',
+              padding: '8px 14px',
+              borderRadius: 7,
+              border: `1px solid rgba(239,68,68,0.3)`,
+              background: 'none',
+              color: '#EF4444',
+              cursor: 'pointer',
+              fontSize: 13,
+              fontFamily: 'inherit',
+              transition: 'background 0.12s, border-color 0.12s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(239,68,68,0.06)'
+              e.currentTarget.style.borderColor = '#EF4444'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'none'
+              e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'
+            }}
+          >
+            Delete Node
+          </button>
+        </div>
+      </div>
+    </>
+  )
+
   return (
     <>
       {/* Backdrop */}
       <div
-        onClick={() => setDetailNode(null)}
-        style={{ position: 'fixed', inset: 0, zIndex: 400 }}
+        onClick={handleClose}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 400,
+          ...(isMobile ? {
+            background: 'rgba(0,0,0,0.45)',
+            opacity: visible ? 1 : 0,
+            transition: 'opacity 0.28s ease',
+          } : {}),
+        }}
       />
 
-      {/* Panel */}
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'fixed',
-          top: isMobile ? 0 : 56,
-          right: 0,
-          bottom: 0,
-          width: isMobile ? '100%' : 360,
-          background: t.surface,
-          borderLeft: `1px solid ${t.border}`,
-          boxShadow: t.panelShadow,
-          zIndex: 500,
-          display: 'flex',
-          flexDirection: 'column',
-          animation: 'slideIn 0.18s cubic-bezier(0.16,1,0.3,1)',
-          overflow: 'hidden',
-        }}
-      >
-        <style>{`
-          @keyframes slideIn {
-            from { transform: translateX(24px); opacity: 0; }
-            to   { transform: translateX(0);    opacity: 1; }
-          }
-        `}</style>
-
-        {/* Header */}
-        <div style={{ padding: '16px 18px 14px', borderBottom: `1px solid ${t.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
-            <input
-              value={data.label}
-              onChange={(e) => update({ label: e.target.value })}
-              placeholder="Node title"
-              style={{
-                flex: 1,
-                fontSize: 17,
-                fontWeight: 600,
-                letterSpacing: '-0.01em',
-                color: t.textPrimary,
-                border: 'none',
-                outline: 'none',
-                background: 'transparent',
-                fontFamily: 'inherit',
-                lineHeight: '1.3',
-              }}
-            />
-            <button
-              onClick={() => setDetailNode(null)}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 18, color: t.textTertiary, padding: '4px 6px',
-                lineHeight: 1, flexShrink: 0, borderRadius: 6,
-                transition: 'color 0.12s ease, background 0.12s ease',
-                minWidth: 32, minHeight: 32,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = t.textPrimary
-                e.currentTarget.style.background = t.hoverBg
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = t.textTertiary
-                e.currentTarget.style.background = 'none'
-              }}
-              title="Close"
-            >
-              ✕
-            </button>
+      {isMobile ? (
+        /* ── Mobile: bottom sheet ── */
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            bottom: 0, left: 0, right: 0,
+            height: '88vh',
+            background: t.surface,
+            borderRadius: '18px 18px 0 0',
+            boxShadow: '0 -6px 32px rgba(0,0,0,0.18)',
+            zIndex: 500,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            transform: visible ? `translateY(${dragY}px)` : 'translateY(100%)',
+            transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.32,0.72,0,1)',
+          }}
+        >
+          {/* Drag handle */}
+          <div
+            onTouchStart={handleDragStart}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
+            style={{
+              padding: '12px 0 6px',
+              display: 'flex',
+              justifyContent: 'center',
+              flexShrink: 0,
+              touchAction: 'none',
+              cursor: 'grab',
+            }}
+          >
+            <div style={{ width: 40, height: 4, borderRadius: 2, background: t.border }} />
           </div>
 
-          {/* Status pills */}
-          <div style={{ display: 'flex', gap: 5 }}>
-            {STATUS_CYCLE.map((s) => {
-              const active = data.status === s
-              return (
-                <button
-                  key={s}
-                  onClick={() => update({ status: s })}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    padding: '4px 10px',
-                    borderRadius: 20,
-                    border: `1px solid ${active ? t.primary : t.border}`,
-                    background: active ? t.primaryLight : 'transparent',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    fontWeight: active ? 600 : 400,
-                    color: active ? t.primaryText : t.textSecondary,
-                    fontFamily: 'inherit',
-                    transition: 'all 0.12s ease',
-                  }}
-                >
-                  <StatusBadge status={s} size={7} />
-                  {STATUS_LABELS[s]}
-                </button>
-              )
-            })}
-          </div>
+          {panelContent}
         </div>
-
-        {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px' }}>
-
-          <Section label="Notes" t={t}>
-            <textarea
-              value={data.notes}
-              onChange={(e) => update({ notes: e.target.value })}
-              placeholder="Add notes…"
-              rows={5}
-              style={textareaStyle}
-            />
-          </Section>
-
-          <Section label="Links" t={t}>
-            {(data.links || []).map((link) => (
-              <div key={link.id} style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                marginBottom: 6, padding: '6px 8px',
-                background: t.inputBg, borderRadius: 7,
-                border: `1px solid ${t.border}`,
-              }}>
-                <a
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    flex: 1, fontSize: 13, color: t.primary,
-                    textDecoration: 'none', overflow: 'hidden',
-                    textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}
-                  title={link.url}
-                >
-                  {link.title || link.url}
-                </a>
-                <button
-                  onClick={() => deleteLink(link.id)}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: t.textTertiary, fontSize: 14, padding: '2px 4px',
-                    lineHeight: 1, flexShrink: 0, borderRadius: 4,
-                    transition: 'color 0.12s',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = t.textTertiary)}
-                  title="Remove"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-
-            {addingLink ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-                <input
-                  placeholder="Title (optional)"
-                  value={linkTitle}
-                  onChange={(e) => setLinkTitle(e.target.value)}
-                  style={inputStyle}
-                />
-                <input
-                  placeholder="https://…"
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') saveLink() }}
-                  style={inputStyle}
-                />
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={saveLink} style={filledBtn(t)}>Save</button>
-                  <button onClick={() => setAddingLink(false)} style={outlineBtn(t)}>Cancel</button>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => setAddingLink(true)}
-                style={{
-                  background: 'none',
-                  border: `1px dashed ${t.border}`,
-                  borderRadius: 7,
-                  padding: '7px 12px',
-                  fontSize: 13,
-                  color: t.textSecondary,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  width: '100%',
-                  marginTop: 2,
-                  transition: 'border-color 0.12s, color 0.12s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = t.primary
-                  e.currentTarget.style.color = t.primaryText
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = t.border
-                  e.currentTarget.style.color = t.textSecondary
-                }}
-              >
-                + Add Link
-              </button>
-            )}
-          </Section>
-
-          <Section label="Resources" t={t}>
-            <textarea
-              value={data.resources}
-              onChange={(e) => update({ resources: e.target.value })}
-              placeholder="Books, videos, files…"
-              rows={4}
-              style={textareaStyle}
-            />
-          </Section>
-
-          {/* Delete */}
-          <div style={{ marginTop: 4, paddingTop: 16, borderTop: `1px solid ${t.border}` }}>
-            <button
-              onClick={() => setConfirmDelete(true)}
-              style={{
-                width: '100%',
-                padding: '8px 14px',
-                borderRadius: 7,
-                border: `1px solid rgba(239,68,68,0.3)`,
-                background: 'none',
-                color: '#EF4444',
-                cursor: 'pointer',
-                fontSize: 13,
-                fontFamily: 'inherit',
-                transition: 'background 0.12s, border-color 0.12s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(239,68,68,0.06)'
-                e.currentTarget.style.borderColor = '#EF4444'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'none'
-                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'
-              }}
-            >
-              Delete Node
-            </button>
-          </div>
+      ) : (
+        /* ── Desktop: right side panel ── */
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            top: 56, right: 0, bottom: 0,
+            width: 360,
+            background: t.surface,
+            borderLeft: `1px solid ${t.border}`,
+            boxShadow: t.panelShadow,
+            zIndex: 500,
+            display: 'flex',
+            flexDirection: 'column',
+            animation: 'slideIn 0.18s cubic-bezier(0.16,1,0.3,1)',
+            overflow: 'hidden',
+          }}
+        >
+          <style>{`
+            @keyframes slideIn {
+              from { transform: translateX(24px); opacity: 0; }
+              to   { transform: translateX(0);    opacity: 1; }
+            }
+          `}</style>
+          {panelContent}
         </div>
-      </div>
+      )}
 
-      {/* Delete confirm */}
+      {/* Delete confirm modal */}
       {confirmDelete && (
         <div
           style={{
@@ -346,6 +439,7 @@ export default function DetailPanel() {
             style={{
               background: t.surface, borderRadius: 14, padding: '24px 28px',
               width: 320, boxShadow: t.modalShadow, border: `1px solid ${t.border}`,
+              margin: '0 16px',
             }}
           >
             <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: 15, color: t.textPrimary }}>

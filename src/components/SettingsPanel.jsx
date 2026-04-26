@@ -38,7 +38,11 @@ export default function SettingsPanel({ onClose, triggerRef }) {
       }
     }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
   }, [onClose, triggerRef])
 
   return (
@@ -54,7 +58,8 @@ export default function SettingsPanel({ onClose, triggerRef }) {
         boxShadow: t.dropdownShadow,
         width: 240,
         zIndex: 600,
-        overflow: 'hidden',
+        overflowY: 'auto',
+        maxHeight: 'calc(100vh - 70px)',
       }}
     >
       {/* Theme section */}

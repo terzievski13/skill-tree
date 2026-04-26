@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import useStore from '../store/useStore'
 import TreeSelector from './TreeSelector'
 import SettingsPanel from './SettingsPanel'
@@ -15,8 +15,17 @@ export default function Toolbar({ onAddNode }) {
   const [nameDraft, setNameDraft] = useState('')
   const [showSelector, setShowSelector] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   const settingsBtnRef = useRef(null)
   const selectorBtnRef = useRef(null)
+
+  useEffect(() => {
+    const handler = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
+  const isMobile = windowWidth < 640
 
   const commitRename = () => {
     const name = nameDraft.trim()
@@ -32,8 +41,8 @@ export default function Toolbar({ onAddNode }) {
         borderBottom: `1px solid ${t.border}`,
         display: 'flex',
         alignItems: 'center',
-        padding: '0 16px',
-        gap: 12,
+        padding: isMobile ? '0 10px' : '0 16px',
+        gap: isMobile ? 8 : 12,
         position: 'relative',
         zIndex: 200,
         flexShrink: 0,
@@ -50,7 +59,7 @@ export default function Toolbar({ onAddNode }) {
           }}
           autoFocus
           style={{
-            fontSize: 18,
+            fontSize: isMobile ? 15 : 18,
             fontWeight: 600,
             color: t.textPrimary,
             border: 'none',
@@ -58,7 +67,8 @@ export default function Toolbar({ onAddNode }) {
             outline: 'none',
             background: 'transparent',
             fontFamily: 'inherit',
-            minWidth: 120,
+            minWidth: 80,
+            maxWidth: isMobile ? 130 : 'none',
           }}
         />
       ) : (
@@ -69,11 +79,16 @@ export default function Toolbar({ onAddNode }) {
           }}
           title="Click to rename"
           style={{
-            fontSize: 18,
+            fontSize: isMobile ? 15 : 18,
             fontWeight: 600,
             color: t.textPrimary,
             cursor: 'text',
             userSelect: 'none',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            maxWidth: isMobile ? 130 : 'none',
+            flexShrink: isMobile ? 1 : 0,
           }}
         >
           {activeTree?.name || 'Loading...'}
@@ -83,12 +98,12 @@ export default function Toolbar({ onAddNode }) {
       <button
         onClick={onAddNode}
         title="Add node"
-        style={btnStyle(t)}
+        style={isMobile ? compactBtnStyle(t) : btnStyle(t)}
         onMouseEnter={(e) => (e.currentTarget.style.background = t.hoverBg)}
         onMouseLeave={(e) => (e.currentTarget.style.background = t.surface)}
       >
         <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
-        Add Node
+        {!isMobile && 'Add Node'}
       </button>
 
       <div style={{ flex: 1 }} />
@@ -100,13 +115,13 @@ export default function Toolbar({ onAddNode }) {
           onClick={() => { setShowSelector((v) => !v); setShowSettings(false) }}
           title="Switch tree"
           style={{
-            ...btnStyle(t),
+            ...(isMobile ? compactBtnStyle(t) : btnStyle(t)),
             background: showSelector ? t.hoverBg : t.surface,
           }}
           onMouseEnter={(e) => (e.currentTarget.style.background = t.hoverBg)}
           onMouseLeave={(e) => (e.currentTarget.style.background = showSelector ? t.hoverBg : t.surface)}
         >
-          Trees ▾
+          {isMobile ? '≡' : 'Trees ▾'}
         </button>
         {showSelector && <TreeSelector onClose={() => setShowSelector(false)} triggerRef={selectorBtnRef} />}
       </div>
@@ -118,13 +133,13 @@ export default function Toolbar({ onAddNode }) {
           onClick={() => { setShowSettings((v) => !v); setShowSelector(false) }}
           title="Settings"
           style={{
-            ...btnStyle(t),
+            ...(isMobile ? compactBtnStyle(t) : btnStyle(t)),
             background: showSettings ? t.hoverBg : t.surface,
           }}
           onMouseEnter={(e) => (e.currentTarget.style.background = t.hoverBg)}
           onMouseLeave={(e) => (e.currentTarget.style.background = showSettings ? t.hoverBg : t.surface)}
         >
-          Settings
+          {isMobile ? '⚙' : 'Settings'}
         </button>
         {showSettings && (
           <>
@@ -153,5 +168,22 @@ function btnStyle(t) {
     fontSize: 13,
     color: t.textPrimary,
     fontFamily: 'inherit',
+  }
+}
+
+function compactBtnStyle(t) {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '6px 10px',
+    borderRadius: 6,
+    border: `1px solid ${t.border}`,
+    background: t.surface,
+    cursor: 'pointer',
+    fontSize: 16,
+    color: t.textPrimary,
+    fontFamily: 'inherit',
+    minWidth: 36,
   }
 }

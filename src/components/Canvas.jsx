@@ -35,16 +35,8 @@ function CanvasInner() {
   const edgeStyle = useStore((s) => s.edgeStyle)
   const t = themes[theme] || themes.light
 
-  const { screenToFlowPosition, fitView } = useReactFlow()
-  const activeTreeId = useStore((s) => s.activeTreeId)
+  const { screenToFlowPosition } = useReactFlow()
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fitView({ padding: isMobile ? 0.3 : 0.5, duration: 200 })
-    }, 50)
-    return () => clearTimeout(timer)
-  }, [activeTreeId, fitView, isMobile])
   const [confirmDeleteNode, setConfirmDeleteNode] = useState(null)
   const [mobileEdgeTap, setMobileEdgeTap] = useState(null) // { id, x, y }
   const selectedNodeIdRef = useRef(null)
@@ -150,7 +142,7 @@ function CanvasInner() {
         onNodeContextMenu={onNodeContextMenu}
         deleteKeyCode={null}
         fitView
-        fitViewOptions={{ padding: isMobile ? 0.3 : 0.5 }}
+        fitViewOptions={{ padding: 0.3, ...(isMobile ? {} : { maxZoom: 0.8 }) }}
         minZoom={0.1}
         maxZoom={3}
       >

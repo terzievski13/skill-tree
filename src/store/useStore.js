@@ -287,6 +287,29 @@ const useStore = create((set, get) => ({
     })
   },
 
+  deleteNodes(nodeIds) {
+    get().saveSnapshot()
+    const idSet = new Set(nodeIds)
+    set((state) => {
+      const id = state.activeTreeId
+      const current = state.treeData[id] || { nodes: [], edges: [] }
+      const next = {
+        ...state,
+        selectedNodeId: idSet.has(state.selectedNodeId) ? null : state.selectedNodeId,
+        detailNodeId: idSet.has(state.detailNodeId) ? null : state.detailNodeId,
+        treeData: {
+          ...state.treeData,
+          [id]: {
+            nodes: current.nodes.filter((n) => !idSet.has(n.id)),
+            edges: current.edges.filter((e) => !idSet.has(e.source) && !idSet.has(e.target)),
+          },
+        },
+      }
+      debouncedSave(next)
+      return next
+    })
+  },
+
   duplicateNode(nodeId) {
     get().saveSnapshot()
     const state = get()

@@ -1,17 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import ReactFlow, {
   Background,
   BackgroundVariant,
   Controls,
+  PanOnScrollMode,
+  SelectionMode,
   useReactFlow,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 
 import useStore from '../store/useStore'
 import SkillNode from './SkillNode'
+import OffsetEdge from './OffsetEdge'
 import { themes } from '../utils/themes'
 
 const nodeTypes = { skillNode: SkillNode }
+const edgeTypes = { offset: OffsetEdge }
+
 
 function CanvasInner() {
   const nodes = useStore((s) => s.getNodes())
@@ -22,6 +27,7 @@ function CanvasInner() {
   const setSelectedNode = useStore((s) => s.setSelectedNode)
   const addNode = useStore((s) => s.addNode)
   const deleteNode = useStore((s) => s.deleteNode)
+  const deleteNodes = useStore((s) => s.deleteNodes)
   const duplicateNode = useStore((s) => s.duplicateNode)
   const cycleStatus = useStore((s) => s.cycleNodeStatus)
   const saveSnapshot = useStore((s) => s.saveSnapshot)
@@ -32,27 +38,52 @@ function CanvasInner() {
   const theme = useStore((s) => s.theme)
   const dotDensity = useStore((s) => s.dotDensity)
   const autoExpand = useStore((s) => s.autoExpand)
-  const edgeStyle = useStore((s) => s.edgeStyle)
+  const activeTreeId = useStore((s) => s.activeTreeId)
   const t = themes[theme] || themes.light
 
-  const { screenToFlowPosition } = useReactFlow()
+  const { screenToFlowPosition, fitView } = useReactFlow()
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
-  const [confirmDeleteNode, setConfirmDeleteNode] = useState(null)
-  const [mobileEdgeTap, setMobileEdgeTap] = useState(null) // { id, x, y }
+  const [confirmDeleteNodes, setConfirmDeleteNodes] = useState(null) // null | Node[]
+  const [mobileEdgeTap, setMobileEdgeTap] = useState(null)
   const selectedNodeIdRef = useRef(null)
   const selectedEdgeIdRef = useRef(null)
+  // Mobile double-tap tracking
+  const lastPaneTapRef = useRef({ time: 0, x: 0, y: 0 })
+  const touchStartRef = useRef(null)
+
+  useEffect(() => {
+    const t = setTimeout(
+      () => fitView({ padding: 0.3, ...(isMobile ? {} : { maxZoom: 0.8 }) }),
+      50
+    )
+    return () => clearTimeout(t)
+  }, [activeTreeId, fitView, isMobile])
 
   const DOT_DENSITY_MAP = { small: { gap: 14, size: 1.0 }, medium: { gap: 22, size: 1.5 }, large: { gap: 35, size: 2.0 } }
   const { gap: dotGap, size: dotSize } = DOT_DENSITY_MAP[dotDensity] || DOT_DENSITY_MAP.medium
 
   const defaultEdgeOptions = {
-    type: edgeStyle || 'smoothstep',
+    type: 'offset',
     style: { stroke: '#94A3B8', strokeWidth: 2 },
-    markerEnd: { type: 'arrowclosed', color: '#94A3B8', width: 12, height: 12 },
   }
 
-  const handlePaneDoubleClick = useCallback(
+  // Force all edges through the custom edge type for selection highlighting
+  const augmentedEdges = useMemo(
+    () => edges.map((e) => ({ ...e, type: 'offset' })),
+    [edges]
+  )
+
+  // Desktop double-click on canvas pane to add a node.
+  // onPaneDoubleClick is not a real ReactFlow 11 prop, so we handle it on the wrapper div.
+  const handleContainerDblClick = useCallback(
     (e) => {
+      if (
+        e.target.closest('.react-flow__node') ||
+        e.target.closest('.react-flow__edge-interaction') ||
+        e.target.closest('.react-flow__edge-path') ||
+        e.target.closest('.react-flow__controls') ||
+        e.target.closest('.react-flow__panel')
+      ) return
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY })
       addNode(position)
     },
@@ -100,9 +131,9 @@ function CanvasInner() {
           selectedEdgeIdRef.current = null
           return
         }
-        if (selectedNodeIdRef.current) {
-          const node = nodes.find((n) => n.id === selectedNodeIdRef.current)
-          if (node) setConfirmDeleteNode(node)
+        const selected = nodes.filter((n) => n.selected)
+        if (selected.length > 0) {
+          setConfirmDeleteNodes(selected)
           return
         }
       }
@@ -122,25 +153,83 @@ function CanvasInner() {
     if (!contextMenuNode) return
     const node = nodes.find((n) => n.id === contextMenuNode.id)
     setContextMenuNode(null)
-    if (node) setConfirmDeleteNode(node)
+    if (node) setConfirmDeleteNodes([node])
   }, [contextMenuNode, nodes, setContextMenuNode])
 
+  // Mobile double-tap to add node
+  const handleContainerTouchStart = useCallback((e) => {
+    // Ignore touches on nodes or edges
+    if (e.target.closest('.react-flow__node') || e.target.closest('.react-flow__edge-interaction') || e.target.closest('.react-flow__edge-path')) {
+      touchStartRef.current = null
+      return
+    }
+    const touch = e.touches[0]
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+  }, [])
+
+  const handleContainerTouchEnd = useCallback((e) => {
+    const start = touchStartRef.current
+    if (!start) return
+
+    const touch = e.changedTouches[0]
+    const dx = Math.abs(touch.clientX - start.x)
+    const dy = Math.abs(touch.clientY - start.y)
+    touchStartRef.current = null
+
+    // Skip if the finger moved (it was a drag/pan, not a tap)
+    if (dx > 10 || dy > 10) return
+    // Skip if touch ended on a node, edge, or any UI panel (controls, toolbar, etc.)
+    if (
+      e.target.closest('.react-flow__node') ||
+      e.target.closest('.react-flow__edge-interaction') ||
+      e.target.closest('.react-flow__edge-path') ||
+      e.target.closest('.react-flow__controls') ||
+      e.target.closest('.react-flow__panel')
+    ) return
+
+    const now = Date.now()
+    const last = lastPaneTapRef.current
+    const tapDx = Math.abs(touch.clientX - last.x)
+    const tapDy = Math.abs(touch.clientY - last.y)
+
+    if (now - last.time < 350 && tapDx < 40 && tapDy < 40) {
+      const pos = screenToFlowPosition({ x: touch.clientX, y: touch.clientY })
+      addNode(pos)
+      lastPaneTapRef.current = { time: 0, x: 0, y: 0 }
+    } else {
+      lastPaneTapRef.current = { time: now, x: touch.clientX, y: touch.clientY }
+    }
+  }, [screenToFlowPosition, addNode])
+
   return (
-    <div style={{ flex: 1, position: 'relative' }} onKeyDown={handleKeyDown} tabIndex={-1}>
+    <div
+      style={{ flex: 1, position: 'relative', touchAction: 'manipulation' }}
+      onKeyDown={handleKeyDown}
+      onDoubleClick={handleContainerDblClick}
+      onTouchStart={handleContainerTouchStart}
+      onTouchEnd={handleContainerTouchEnd}
+      tabIndex={-1}
+    >
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={augmentedEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         onNodeClick={handleNodeClick}
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
-        onPaneDoubleClick={handlePaneDoubleClick}
         onNodeContextMenu={onNodeContextMenu}
         deleteKeyCode={null}
+        zoomOnDoubleClick={false}
+        panOnScroll={true}
+        panOnScrollMode={PanOnScrollMode.Free}
+        selectionOnDrag={true}
+        selectionMode={SelectionMode.Partial}
+        panOnDrag={[1, 2]}
         fitView
         fitViewOptions={{ padding: 0.3, ...(isMobile ? {} : { maxZoom: 0.8 }) }}
         minZoom={0.1}
@@ -153,7 +242,10 @@ function CanvasInner() {
           color={t.dotColor}
           style={{ background: t.canvasBg }}
         />
-        <Controls showInteractive={false} />
+        <Controls
+          showInteractive={false}
+          style={isMobile ? { bottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)', left: 21} : undefined}
+        />
       </ReactFlow>
 
       {contextMenuNode && (
@@ -168,16 +260,20 @@ function CanvasInner() {
         />
       )}
 
-      {confirmDeleteNode && (
+      {confirmDeleteNodes && (
         <DeleteConfirmModal
-          label={confirmDeleteNode.data.label}
+          nodes={confirmDeleteNodes}
           t={t}
           onConfirm={() => {
-            deleteNode(confirmDeleteNode.id)
+            if (confirmDeleteNodes.length === 1) {
+              deleteNode(confirmDeleteNodes[0].id)
+            } else {
+              deleteNodes(confirmDeleteNodes.map((n) => n.id))
+            }
             selectedNodeIdRef.current = null
-            setConfirmDeleteNode(null)
+            setConfirmDeleteNodes(null)
           }}
-          onCancel={() => setConfirmDeleteNode(null)}
+          onCancel={() => setConfirmDeleteNodes(null)}
         />
       )}
 
@@ -264,7 +360,18 @@ function NodeContextMenu({ x, y, t, onClose, onDelete, onDuplicate, onCycleStatu
   )
 }
 
-function DeleteConfirmModal({ label, t, onConfirm, onCancel }) {
+function DeleteConfirmModal({ nodes, t, onConfirm, onCancel }) {
+  const isSingle = nodes.length === 1
+  const label = isSingle ? nodes[0].data.label : null
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); onConfirm() }
+      if (e.key === 'Escape') onCancel()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onConfirm, onCancel])
+
   return (
     <div
       style={{
@@ -281,10 +388,12 @@ function DeleteConfirmModal({ label, t, onConfirm, onCancel }) {
         }}
       >
         <p style={{ margin: '0 0 8px', fontWeight: 600, fontSize: 16, color: t.textPrimary }}>
-          Delete node?
+          {isSingle ? 'Delete node?' : `Delete ${nodes.length} nodes?`}
         </p>
         <p style={{ margin: '0 0 20px', fontSize: 14, color: t.textSecondary }}>
-          "{label}" and all its connections will be removed.
+          {isSingle
+            ? `"${label}" and all its connections will be removed.`
+            : `${nodes.length} nodes and all their connections will be removed.`}
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={onCancel} style={secondaryBtn(t)}>Cancel</button>
